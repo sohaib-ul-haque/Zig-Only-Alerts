@@ -25,7 +25,7 @@ async function sendToChat(text: string): Promise<void> {
 
 export async function sendAlert(
   amount: number,
-  rawAmount: string,
+  rawAmount: bigint,
   sender: string,
   recipient: string,
   txHash: string,
@@ -47,7 +47,7 @@ export async function sendAlert(
     `Direction: Received\n\n` +
     `Sender: ${sender}\n` +
     `Recipient: ${recipient}\n\n` +
-    `Amount: ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ZIG (${parseInt(rawAmount).toLocaleString()} uzig)\n` +
+    `Amount: ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ZIG (${rawAmount.toLocaleString("en-US")} ${config.zig.denom})\n` +
     usdLine +
     `Type: Transfer\n\n` +
     `Tx: ${config.txExplorer}${txHash}`;

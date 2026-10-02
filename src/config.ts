@@ -1,10 +1,17 @@
 import "dotenv/config";
+import { decimalToRaw } from "./amount";
 
 function requireEnv(key: string): string {
   const val = process.env[key];
   if (!val) throw new Error(`Missing required env var: ${key}`);
   return val;
 }
+
+const zigDecimals = parseInt(requireEnv("ZIG_DECIMALS"), 10);
+if (!Number.isSafeInteger(zigDecimals) || zigDecimals < 0) {
+  throw new Error(`Invalid ZIG_DECIMALS: ${requireEnv("ZIG_DECIMALS")}`);
+}
+const zigThreshold = requireEnv("THRESHOLD_ZIG");
 
 export const config = {
   telegram: {
@@ -19,8 +26,9 @@ export const config = {
   txExplorer: requireEnv("TX_EXPLORER"),
   zig: {
     denom: requireEnv("ZIG_DENOM"),
-    decimals: parseInt(requireEnv("ZIG_DECIMALS")),
-    minThreshold: parseFloat(requireEnv("THRESHOLD_ZIG")),
+    decimals: zigDecimals,
+    minThreshold: parseFloat(zigThreshold),
+    minThresholdRaw: decimalToRaw(zigThreshold, zigDecimals),
   },
   price: {
     coingeckoId: process.env.COINGECKO_ID ?? "zignaly",

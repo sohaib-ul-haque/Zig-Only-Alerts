@@ -2,6 +2,7 @@ import WebSocket from "ws";
 import { config } from "./config";
 import { sendAlert } from "./telegram";
 import { getZigUsdPrice } from "./price";
+import { parseRawAmount, rawToDecimalString } from "./amount";
 
 interface FlatEvents {
   [key: string]: string[];
@@ -11,17 +12,17 @@ function first(events: FlatEvents, key: string): string | undefined {
   return events[key]?.[0];
 }
 
-function parseAmount(raw: string): { amountRaw: string; denom: string } | null {
+function parseAmount(raw: string): { amountRaw: bigint; denom: string } | null {
   // Pure digits - denom comes from separate field
   if (/^\d+$/.test(raw)) {
-    return { amountRaw: raw, denom: "" };
+    return { amountRaw: parseRawAmount(raw), denom: "" };
   }
 
-  // Combined string like "500000uzig"
+  // Combined string like "500000azig"
   if (raw.includes(config.zig.denom)) {
     const amountPart = raw.replace(config.zig.denom, "").trim();
     if (/^\d+$/.test(amountPart)) {
-      return { amountRaw: amountPart, denom: config.zig.denom };
+      return { amountRaw: parseRawAmount(amountPart), denom: config.zig.denom };
     }
   }
 
@@ -31,7 +32,7 @@ function parseAmount(raw: string): { amountRaw: string; denom: string } | null {
 interface Candidate {
   sender: string;
   recipient: string;
-  amountRaw: string;
+  amountRaw: bigint;
 }
 
 /**
@@ -61,8 +62,6 @@ function collectCandidates(events: FlatEvents): Candidate[] {
 
     const denom = parsed.denom || config.zig.denom;
     if (denom !== config.zig.denom) continue;
-    if (!/^\d+$/.test(parsed.amountRaw)) continue;
-
     candidates.push({ sender, recipient, amountRaw: parsed.amountRaw });
   }
 
@@ -87,14 +86,16 @@ async function processFlatEvents(events: FlatEvents): Promise<void> {
   // A tx can legitimately contain multiple qualifying transfers (e.g.
   // multi-send). Check each one independently against the threshold.
   for (const { sender, recipient, amountRaw } of candidates) {
-    const humanAmount = parseFloat(amountRaw) / Math.pow(10, config.zig.decimals);
+    // Threshold decisions use exact raw integers. Number is used only for
+    // the existing human-facing log/Telegram/USD presentation.
+    const humanAmount = Number(rawToDecimalString(amountRaw, config.zig.decimals));
 
     console.log(
       `    ${sender.slice(0, 12)}... -> ${recipient.slice(0, 12)}...  ` +
       `${humanAmount.toLocaleString()} ZIG (threshold: ${config.zig.minThreshold})`
     );
 
-    if (humanAmount < config.zig.minThreshold) {
+    if (amountRaw < config.zig.minThresholdRaw) {
       continue;
     }
 
